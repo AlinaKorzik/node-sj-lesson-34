@@ -61,6 +61,14 @@ exports.getCats = async () => {
     return cats
 }
 
+exports.getUsers = async () => {
+    const users = await catModel.fetchAllUsers()
+    if (!users.lenght) {
+        return getNotFoundResponse(res)
+    }
+    return users
+}
+
 exports.getCatById = async (res, catId) => {
     const cat = await cache(catId, catModel.fetchCatById, res)
     if (!cat) {
@@ -69,12 +77,47 @@ exports.getCatById = async (res, catId) => {
     return cat
 }
 
+exports.getUserById = async (res, userId) => {
+    const user = await cache(userId, catModel.fetchUserById, res)
+    const cats = await catModel.fetchAllCats()
+    const pets = user.pets.split(', ')
+    let arrOfPets = [];
+    cats.forEach((cat) => {
+        if(pets.includes(cat.id)) {
+            arrOfPets.push(cat)
+       }
+    })
+    user.arrOfPets = arrOfPets
+    
+    if(!user) {
+        return getNotFoundResponse(res)
+    }
+    return user
+}
+
 exports.createCat = async (req) => {
     const catData = await parseJsonBody(req)
     catData.id = uuid()
+    catData.ownerId = null
     await catModel.addNewCat(catData)
     return {
         catData
+    }
+}
+
+exports.createUser = async (req) => {
+    const userData = await parseJsonBody(req)
+    userData.id = uuid()
+    const cats = await catModel.fetchAllCats()
+    const pets = userData.pets.split(', ')
+    cats.forEach((cat) => {
+        if(pets.includes(cat.id)) {
+            cat.ownerId = userData.id
+       }
+    })
+    await catModel.addNewUser(userData)
+    return {
+        userData
     }
 }
 
@@ -89,6 +132,17 @@ exports.updateCatById = async (req, res, catId) => {
     return updatedCat
 }
 
+exports.updateUserById = async (req, res, userId) => {
+    const updateData = await parseJsonBody(req)
+    const user = await catModel.fetchUserById(userId)
+    const updatedUser = { ...user, ...updateData }
+    const updateResult = await catModel.updateUser(updatedUser)
+    if (!updateResult) {
+        return getNotFoundResponse(res)
+    }
+    return updatedUser
+}
+
 exports.deleteCatById = async (res, catId) => {
     const updateResult = await catModel.delete(catId)
     if (!updateResult) {
@@ -96,5 +150,15 @@ exports.deleteCatById = async (res, catId) => {
     }
     return {
         id: catId
+    }
+}
+
+exports.deleteUserById = async (res, userId) => {
+    const updateResult = await catModel.deleteUser(userId)
+    if (!updateResult) {
+        return getNotFoundResponse(res)
+    }
+    return {
+        id: userId
     }
 }
